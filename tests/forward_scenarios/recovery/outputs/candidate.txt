@@ -1,0 +1,2 @@
+Recovered synthetic result
+operation_id=op-001

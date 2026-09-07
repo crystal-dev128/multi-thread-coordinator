@@ -1,0 +1,6 @@
+__pycache__/
+*.py[cod]
+.skill-validate-deps/
+.stage*-forward/
+.test-*/
+.tmp-*/

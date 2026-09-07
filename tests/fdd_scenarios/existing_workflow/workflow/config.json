@@ -1,0 +1,21 @@
+{
+  "workflow_id": "synthetic_fdd_workflow_v1",
+  "authority_id": "synthetic_workflow_config_v1",
+  "supported_modules": ["revenue_summary"],
+  "unsupported_modules": {
+    "net_debt": "source confirmation and debt mapping are not implemented in this Workflow"
+  },
+  "authorities": {
+    "revenue_data": "data/revenue.csv",
+    "revenue_rules": "rules/revenue_rules.json"
+  },
+  "write_rules": {
+    "single_writer": "coordinator",
+    "allowed_outputs": [
+      "results/current_revenue_summary.json",
+      "results/request_limitations.md"
+    ]
+  },
+  "validation_command": "python scripts/validate_outputs.py",
+  "forbidden_directories": ["AGENT_WORKSPACE", "HUMAN_PORTAL", "RESULTS"]
+}

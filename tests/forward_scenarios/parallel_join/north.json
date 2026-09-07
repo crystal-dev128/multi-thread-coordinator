@@ -1,0 +1,7 @@
+{
+  "region": "North",
+  "programs": [
+    {"title": "Cold Weather Setup", "audience": "Field teams", "duration_hours": 2.5},
+    {"title": "Inventory Handoff", "audience": "Shift leads", "duration_hours": 1.5}
+  ]
+}

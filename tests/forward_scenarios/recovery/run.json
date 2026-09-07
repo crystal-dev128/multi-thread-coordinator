@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "run_id": "run_0001",
+  "batch_id": "batch_0001",
+  "binding_id": "binding_v001",
+  "chains": [],
+  "tasks": [
+    {
+      "task_id": "task_write_candidate",
+      "status": "running",
+      "depends_on": [],
+      "consumes": [],
+      "current_attempt_id": "attempt_write_001"
+    }
+  ],
+  "attempts": [
+    {
+      "attempt_id": "attempt_write_001",
+      "task_id": "task_write_candidate",
+      "owner": "interrupted_worker",
+      "delivered_at": "2026-08-25T02:00:00Z",
+      "uncertain_at": "2026-08-25T02:01:00Z"
+    }
+  ],
+  "candidates": [],
+  "evidence": [],
+  "reviews": [],
+  "supersedes": [],
+  "active_work": [
+    {
+      "active_id": "active_write_001",
+      "kind": "task",
+      "owner": "interrupted_worker",
+      "task_id": "task_write_candidate",
+      "attempt_id": "attempt_write_001",
+      "writes": ["outputs/candidate.txt"],
+      "isolation_key": null
+    }
+  ]
+}

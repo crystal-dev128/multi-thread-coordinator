@@ -1,0 +1,8 @@
+{
+  "authority_id": "metrics_v2",
+  "replaces": "metrics_v1",
+  "period": "Q1 synthetic revised",
+  "revenue": 100.0,
+  "cost": 85.0,
+  "margin": 15.0
+}

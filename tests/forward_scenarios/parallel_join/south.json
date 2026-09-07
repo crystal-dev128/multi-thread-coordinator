@@ -1,0 +1,7 @@
+{
+  "region": "South",
+  "programs": [
+    {"title": "Heat Safety Brief", "audience": "Field teams", "duration_hours": 1.0},
+    {"title": "Route Closeout", "audience": "Dispatchers", "duration_hours": 2.0}
+  ]
+}

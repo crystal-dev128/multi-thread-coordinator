@@ -1,0 +1,33 @@
+{
+  "authority_id": "synthetic_analysis_rules_v1",
+  "scope": "synthetic preliminary FDD-style analysis only",
+  "currency": "LCU",
+  "revenue_and_gross_profit": {
+    "period": "Q1 2026",
+    "revenue": "sum monthly_financials.revenue",
+    "gross_profit": "sum monthly_financials.revenue minus sum monthly_financials.cogs",
+    "gross_margin_pct": "gross_profit divided by revenue times 100",
+    "revenue_change_january_to_march": "March revenue minus January revenue"
+  },
+  "working_capital": {
+    "formula": "accounts_receivable plus inventory minus accounts_payable",
+    "movement": "closing net working capital minus opening net working capital"
+  },
+  "rounding": {
+    "amounts": 2,
+    "percentages": 2
+  },
+  "required_note_sections": [
+    "Scope and source basis",
+    "Revenue and gross profit",
+    "Net working capital",
+    "Limitations"
+  ],
+  "prohibited_conclusions": [
+    "audit assurance",
+    "approval status",
+    "accounting policy conclusion",
+    "investment recommendation",
+    "cash flow characterization not stated by this authority"
+  ]
+}

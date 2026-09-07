@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "binding_id": "binding_v001",
+  "batch_id": "batch_0001",
+  "run_id": "run_0001",
+  "objective": "produce one synthetic idempotent candidate",
+  "latest_constraints": ["do not blindly repeat the write"],
+  "current_candidates": [],
+  "verified_evidence": [],
+  "decisions": [],
+  "succeeded_work": [],
+  "pending_work": ["task_write_candidate"],
+  "superseded_work": [],
+  "active_work": ["active_write_001"],
+  "uncertain_attempts": ["attempt_write_001"],
+  "blocker": null,
+  "next_action": "inspect outputs/candidate.txt before any retry"
+}
