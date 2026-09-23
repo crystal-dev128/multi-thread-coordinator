@@ -58,7 +58,7 @@ class DeliveryPackageTests(unittest.TestCase):
 
         self.assertIn("crystal-dev128/multi-thread-coordinator", readme)
         self.assertIn("$skill-installer", readme)
-        self.assertIn("v0.1.0", readme)
+        self.assertIn("v0.1.1", readme)
         self.assertIn("Do not add real client data", readme)
         self.assertNotIn("private repository", readme.lower())
         self.assertIn("MIT License", license_text)
@@ -84,7 +84,7 @@ class DeliveryPackageTests(unittest.TestCase):
         self.assertIn("create_thread", entrypoint)
         self.assertIn("wait_threads", entrypoint)
         self.assertIn(
-            "expected_return: automatic | task_event | push | manual",
+            "expected_return: automatic | task_event | notify | push | manual",
             protocol,
         )
         self.assertIn("clientThreadId", protocol)
@@ -209,10 +209,8 @@ class DeliveryPackageTests(unittest.TestCase):
         # The adapter is bound by observed capability, not by product name.
         self.assertIn("Detect the Host by Capability, Not by Name", hosts)
 
-        # Both return models are described, and the invariant names the failure
-        # rather than one host's transport.
-        self.assertIn("Pull return (Codex)", hosts)
-        self.assertIn("Re-invocation return (Claude Code)", hosts)
+        # The protocol retains both models without binding section wording
+        # to permanent product-specific wake behavior.
         self.assertIn("### 6a. Two Return Models", protocol)
         self.assertIn("never abandon it or hand the user an unverified", entrypoint)
 

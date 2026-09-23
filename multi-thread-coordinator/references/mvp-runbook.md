@@ -73,7 +73,7 @@ batch_id: batch_NNNN
 run_id: run_NNNN
 binding_id: binding_vNNN | null
 skill_commit_at_creation: <immutable installed Skill revision>
-return_contract_version: automatic_v1 | task_event_v1 | push_v1 | manual_v1
+return_contract_version: automatic_v1 | task_event_v1 | notify_v1 | push_v1 | manual_v1
 coordinator_id: <canonical native coordinator identity>
 schema_provenance: <trusted-writer created_v2 or migrated_from_v1 structural attestation>
 coordinator_return_target: {task_id: <task>, host_id: <host>} | null
@@ -94,7 +94,7 @@ tasks:
     writes: []
     deliverables: []
     acceptance: []
-    expected_return: automatic | task_event | push | manual
+    expected_return: automatic | task_event | notify | push | manual
     return_contract_version: automatic_v1 | task_event_v1 | notify_v1 | push_v1 | manual_v1
     worker_task_identity: <created worker identity, such as threadId/hostId or agent name/id, or null>
     return_target: <worker task for task_event, coordinator task for push, or null>
@@ -102,6 +102,8 @@ tasks:
 ready_now: []
 held: []
 ```
+
+Also retain the current stage, next action, acceptance state, and user-delivery receipt in native history under [handoffs.md](handoffs.md); these are not extensions to the persisted v2 schema.
 
 Keep reasoning outside the record except for one mode rationale and concrete hold reasons. Do not persist copied source content, credentials, internal chain-of-thought, or a full duplicate of native task history.
 
@@ -115,7 +117,7 @@ A task is ready only when:
 - its authoritative inputs are available and stable for the attempt;
 - its write set has one owner and conflicts with no concurrently ready task;
 - the selected owner has the required read, write, tool, return, and evidence capabilities;
-- a user-visible task can use native task-event waiting, or has a verified worker-push path, when autonomous continuation is expected;
+- a user-visible task can use native task-event waiting, verified wake notifications, or a verified worker-push path with supported coordinator continuation, when autonomous continuation is expected;
 - every required external or consequential action is already allowed;
 - its acceptance can be observed from available primary evidence.
 
@@ -144,8 +146,11 @@ Prohibited: <paths, data movement, publication, destructive actions, or scope>
 Deliverable: <location and concrete artifact>
 Evidence required: <primary observations>
 Acceptance: <observable pass conditions>
-Return: <where the candidate and evidence must be reported>
-Return mode: <automatic subagent return, task_event by worker task ID/host, verified push, or disclosed manual return>
+Coordinator: <actual native identity and routing target, or native parent>
+Return: <verified native channel; follow handoffs.md on completion, failure, blockage, or required input>
+Return report: <request/stage/attempt, disposition, paths and candidate identity, evidence, unresolved items, next action/owner>
+Approval refusal: <return stated reason, held action/target/candidate, exact worker identity/title, observed user remedy; coordinator routes the user under handoffs.md>
+Return mode: <automatic subagent return, task_event by worker task ID/host, notify by armed worker identity, verified push, or disclosed manual return>
 Return events: <completed or needs_attention for task_event; result, needs_input, or blocked for push>
 Stop when: <missing input, authority conflict, unsafe write, or other concrete condition>
 ```
@@ -157,8 +162,8 @@ Make the brief self-contained through pointers, not copied project context. Incl
 Run this event-driven loop until no ready work remains:
 
 1. Select the smallest useful set of ready, write-safe tasks.
-2. Reconfirm owner capability and permissions immediately before dispatch.
-3. Dispatch through the native surface. For a user-visible task, use the host's durable worker creation capability, such as `create_thread` on Codex or a background agent on Claude Code, and capture its ready worker identity. Where creation yields `threadId` and `hostId`, capture both; a `clientThreadId` means setup is still pending and is not a valid wait target.
+2. Recheck owner capability and the still-applicable authorization immediately before dispatch. This is a coordinator check, not a request for the user to authorize the same action again.
+3. Dispatch through the native surface. For a user-visible task, use the host's durable worker creation capability, such as `create_thread` on Codex or a background agent on Claude Code, and capture its ready worker identity. Where creation yields `threadId` and `hostId`, capture both; a `clientThreadId` means setup is still pending and is not a valid wait target. Preserve the receipt and follow [runtime-recovery.md](runtime-recovery.md) to resolve the exact task without creating a duplicate.
 4. Record the dispatch Skill revision and return-contract version. For every delivered task-event, notify, push, or manual attempt, including preserved history, require the ready native worker identity; task-event additionally requires its first native wait, and notify additionally requires `return_armed_at`, the moment the host's notification path for that exact worker became live. These modes require a `user_visible_task` or `worktree` surface. If a coordinator return target is recorded, keep its exact native task/host pair distinct from every delivered task-event, notify, push, or manual producer in the run and every required reviewer. For push, bind that exact target plus verified native-send evidence before preflight; for manual, record disclosure and evidence before delivery; for automatic, require `internal_subagent` and bind the native parent/worker identities. Mark the identified attempt `running` only after its mode contract exists; treat tool delivery only as a transport observation.
 5. Satisfy the host's return model. For `expected_return: task_event`, call the native event wait capability such as `wait_threads` for the exact worker identity before ending the coordinator turn, and wait on all eligible user-visible workers together when the surface supports it. For `expected_return: notify`, end the turn after arming and resume from the host's notification; polling in-turn returns no sooner. Never leave a delivered attempt with no live return path.
 6. On a bounded task-event timeout, preserve the returned cursor and wait again without treating the task as failed or reading it repeatedly. A notify attempt has no cursor and needs no re-arming; an absent notification is not a failure. Under either contract, new user input may interrupt the return; retain the worker identity and resume, redirect, or supersede it according to that input.
@@ -166,8 +171,8 @@ Run this event-driven loop until no ready work remains:
 8. Before unrelated new material dispatch—including independent-review dispatch—reconcile every completion or attention event already returned to the coordinator. Reconciliation must be strictly earlier than the later dispatch; equal timestamps do not prove order. Inspect the real candidate and primary evidence. Use a bounded worker read, such as `read_thread`, only when returned detail is insufficient or recovery requires it, not as the ordinary completion detector; where the host's stored worker output is a full transcript rather than a result, use the returned result instead.
 9. Mark `succeeded` only after task and candidate carry the same nonempty unique criterion set, exactly one passing current-authority/current-candidate evidence row covers each criterion, every effective review is clean, validly superseded, or—only when optional—exactly evidence-adjudicated by the coordinator, dependencies passed their acceptance-time gate, and the attempt records `accepted_by` as the canonical coordinator. Otherwise record the precise non-pass status.
 10. Recompute ready and held work from current accepted candidates and authority.
-11. Send a correlated next-stage or rework brief to the same worker when appropriate, then establish a fresh task-event wait or verified push contract for that attempt.
-12. Give the user a compact update when a material gate passes, a concrete issue arises, or the ready set changes materially.
+11. Send a correlated next-stage or rework brief to the same worker when appropriate, then establish the host-appropriate return path for that attempt: a fresh task-event wait, notify arming, or verified push contract.
+12. Apply [handoffs.md](handoffs.md) in this same active turn: pair receipt with actual review, rework, continuation, delivery, or a concrete hold. Before ending, process current returned-but-unprocessed and accepted-but-undelivered outcomes; record final user delivery separately from acceptance. Give the user a compact update when a material gate passes, a concrete issue arises, or the ready set changes materially.
 
 Inspect native task state directly only for recovery: after an interruption, ambiguous return transport, a user status request, or an evidence gap in the returned event. This is reconciliation, not routine progress supervision. Do not report repeated unchanged state or turn worker availability into a reason to create unnecessary tasks.
 
@@ -191,6 +196,8 @@ For persisted v2, use only the compact supported task fields and give each accep
 - observation: what the coordinator inspected or measured;
 - inference: the conclusion drawn from facts and observations.
 
+For numerical re-performance, bind the check to the source precision, units, and governing rounding rule. Recompute from authoritative full-precision values with exact decimal or other suitable arithmetic; round only at the specified boundary. A mismatch produced by reusing rounded display values is not yet a candidate defect. If only displayed values exist, state the resulting verification limit and obtain the necessary source evidence rather than inventing precision or a tolerance. The check must still reject a real discrepancy beyond the source-supported rounding boundary.
+
 Reject summaries that do not identify the actual candidate or let the coordinator inspect it. If the candidate changes, require new evidence for affected criteria.
 
 ## 8. Recommend Worker Surfaces
@@ -204,7 +211,7 @@ Recommended worker surfaces:
 Question: Use this recommended mix, or change any named package to the other surface?
 ```
 
-Ask once per run unless later requirements create a materially different work package. One user answer authorizes the named user-visible tasks for that run. Do not ask about every stage in a continuing chain; reuse its selected worker. Do not ask for small helpers when an internal subagent is plainly sufficient.
+Use a still-applicable surface choice from the conversation without asking again. Ask once only for material packages that lack a choice, unless later requirements create a materially different work package. One user answer authorizes the named user-visible tasks for that run. Do not ask about every stage in a continuing chain; reuse its selected worker. Do not ask for small helpers when an internal subagent is plainly sufficient.
 
 ## 9. Coordinate Independent Parallel Cases
 
@@ -245,7 +252,9 @@ At closure, map every effective TODO item to a status, identify usable outputs, 
 
 ## 11. Handle User Questions and Changes
 
-Treat a status question as a request for the current compact report; do not start a new batch.
+Respond to new user input before resuming a wait. Treat a status question as a request for the current compact report; do not start a new batch. Keep unaffected tasks running and preserve their identities and cursors. A task that has not returned does not block authorized independent work. For an already received event, first perform bounded reconciliation under the protocol; full acceptance can remain held while independent work proceeds.
+
+Preserve explicit pause and cancellation instructions in native task history or the recovery capsule, alongside the observed execution state. Do not automatically resume such work when handling a new request. A requested stop is not proof that a running operation stopped: use the available native control within authorization and verify its result, or retain the uncertainty. These observations do not add `paused` or `cancelled` to the persisted protocol status enum, and do not manufacture `succeeded` or `superseded` merely to close a run. After verifying a requested cancellation and its remaining side effects, report the work as intentionally not done and stop pursuing that cancelled objective. The current strict schema has no standalone cancellation terminal state: retain its historical records without claiming `--closure` for the original outcome. This audit limitation must not keep a cancelled worker alive, create a replacement task, or block a user answer or independent authorized work.
 
 Treat an additive requirement as new work in the current batch only when it does not change authoritative input or the intended result of existing work. Recompute dependencies and writes before dispatch.
 
@@ -278,7 +287,7 @@ Before treating the basic coordination MVP as usable, verify both probes against
 - The first push-to-task-event transition is validated once against pushes unresolved at transition delivery and covers them through complete acyclic lineage; later task-event retries reuse it through ancestry, while omitted, repeated, side-chain, and cyclic migrations fail.
 - Task/candidate criteria and candidate-bound passing evidence have exact, nonempty, unique set coverage; implicit waivers fail.
 - A required review keeps producer, reviewer, and coordinator pairwise distinct, uses a different native task from production, and only the coordinator is recorded as `accepted_by`.
-- Candidate admission follows producer-return reconciliation, review delivery follows admission, and the first wait follows review delivery.
+- Candidate admission follows producer-return reconciliation, review delivery follows admission, and the first wait or notification arming follows review delivery under the selected contract.
 - Every effective review gates acceptance; a clean review cannot mask an adverse review. Supersession requires a coordinator-owned exact evidence-bound resolution, while an optional adverse review may remain effective only when the coordinator exactly adjudicates every adverse criterion with prior bound evidence and no confirmed material disposition.
 - `consumes` rejects duplicate, unknown, or candidate/authority-ambiguous identities; every consumed candidate and declared prerequisite gates every current and retry-ancestor delivery strictly before dispatch, even when `depends_on` is omitted.
 - Every candidate and producer attempt link each other exactly, and every non-superseded task with delivered work identifies a delivered `current_attempt_id`, including failed, blocked, and needs-input outcomes.

@@ -134,7 +134,7 @@ Set concurrency to the lowest of ready independent work, platform capacity, writ
 
 ## 5. Task Brief Contract
 
-Use this logical shape for every dispatched task:
+Use this logical shape for every dispatched task. Every producer and reviewer brief also includes the mandatory coordinator identity, return channel, full report, and terminal/attention return obligation from [handoffs.md](handoffs.md). This brief-level contract does not add fields to strict persisted attempt or review schemas:
 
 ```yaml
 identity:
@@ -164,37 +164,42 @@ acceptance_criteria:
   - criterion_id: criterion_<slug>
     requirement: <one current observable requirement>
 return:
-  expected_return: automatic | task_event | push | manual
-  return_contract_version: automatic_v1 | task_event_v1 | push_v1 | manual_v1
+  expected_return: automatic | task_event | notify | push | manual
+  return_contract_version: automatic_v1 | task_event_v1 | notify_v1 | push_v1 | manual_v1
   skill_commit_at_dispatch: <immutable installed Skill commit or revision>
   worker_thread_id: <created native task id or null>
   worker_host_id: <native host id when required or null>
+  # task_event only:
   first_wait_at: <timestamp or null>
   return_cursor: <latest native wait cursor or null>
+  # notify only (omit the two fields above):
+  return_armed_at: <timestamp or null>
   coordinator_task_id: <exact native task id or null>
   coordinator_host_id: <native host id when required or null>
   events: [completed, needs_attention] | [result, needs_input, blocked]
-  required_fields: [run_id, task_id, attempt_id, disposition]
+  required_fields: [run_id, task_id, attempt_id, stage, disposition, candidate_identity, artifact_paths, evidence, unresolved_items, next_action]
 stop_or_escalate_when: []
 ```
 
-Use one objective and only the unlocked stage. Name output locations before work begins. Make acceptance observable. Point to authoritative inputs instead of copying them. Exclude credentials, accumulated chat history, hidden permissions, and the coordinator's untested conclusions.
+Select one return mode and omit inapplicable mode fields rather than persisting this template’s alternatives or null placeholders. Use one objective and only the unlocked stage. Name output locations before work begins. Make acceptance observable. Point to authoritative inputs instead of copying them. Exclude credentials, accumulated chat history, hidden permissions, and the coordinator's untested conclusions.
 
 ## 6. Attempts and Message Correlation
 
 Use native task or subagent history. Do not create a mailbox, socket, callback file, message card system, or permanent message broker. Internal subagents return through their native parent relationship.
 
-For a user-visible task, default to `expected_return: task_event`:
+For a user-visible task on an in-turn-wait host, default to `expected_return: task_event`; select `notify` instead when verified host capabilities support wake notifications:
 
 1. Create the task through the native user-visible task surface, such as `create_thread`, and capture its returned `threadId` and `hostId`.
-2. Record the attempt's `skill_commit_at_dispatch`, `return_mode`, and `return_contract_version`. Mark it delivered only after a ready worker identity exists. If creation returns only `clientThreadId`, record setup as pending and resolve the ready task before waiting or claiming dispatch. On a host that returns a usable worker identity immediately, that precaution is satisfied on creation.
+2. Record the attempt's `skill_commit_at_dispatch`, `return_mode`, and `return_contract_version`. Mark it delivered only after a ready worker identity exists. If creation returns only `clientThreadId`, record setup as pending and resolve the ready task before waiting or claiming dispatch, following [runtime-recovery.md](runtime-recovery.md). Keep the creation receipt in native history or the recovery capsule rather than inserting a queued ID into the strict attempt schema. On a host that returns a usable worker identity immediately, that precaution is satisfied on creation.
 3. Establish the return path required by the host's model, then mark the attempt `running`. Call the native event wait capability, such as `wait_threads`, with the exact worker identity under `task_event`, and record the first wait contract; for multiple ready workers, use one supported multi-target wait rather than one status loop per task. Under `notify`, confirm instead that the host's notification path for that exact worker is live, record `return_armed_at`, and end the turn; resuming happens from the notification. See Section 6a.
 4. Treat `completed` or `needs_attention` as a returned event. Preserve the returned final text, question, worker identity, and cursor with the attempt.
 5. Treat a bounded wait timeout as no new event, not as failure, completion, or permission to retry mutation. Reuse the returned cursor in the next bounded wait and avoid narrating unchanged snapshots.
 6. If user input interrupts the wait, classify that input, retain the worker identity and cursor, and resume or supersede the wait according to the current requirement. Do not lose the running task from active-work accounting.
 7. Use a bounded worker read, such as `read_thread`, only to recover omitted evidence, inspect a task that needs attention, answer a user status request, or reconcile after interruption. It is not the normal completion detector. Where the host's stored worker output is the worker's full transcript rather than its result, read the returned result instead of that file; reading the transcript can exhaust the coordinator's own context and end the run.
 
-Apply a return-first barrier: before dispatching unrelated new material work, reconcile every `completed` or `needs_attention` event already delivered to the coordinator. Correlate it to the current attempt, classify stale or superseded output, inspect its candidate or blocker, and record the coordinator reconciliation. Receiving or reconciling a return still does not accept it.
+Apply the same-turn action and delivery contract in [handoffs.md](handoffs.md) to producer and reviewer returns. Reconciliation alone does not discharge follow-through or user delivery.
+
+Apply a return-first barrier: before dispatching unrelated new material work, reconcile every `completed` or `needs_attention` event already delivered to the coordinator. Correlate it to the current attempt, classify stale or superseded output, inspect its candidate or blocker, and record the coordinator reconciliation. Receiving or reconciling a return still does not accept it. Reconciliation identifies the attempt, inspects the returned candidate or blocker enough to establish its current disposition, and records what remains unverified. It need not complete all acceptance calculations or independent review before unrelated work may proceed. Never defer a direct user answer behind that gate, and never bypass the return-first barrier for a new material dispatch.
 
 Use strict causal ordering unless a platform-supplied monotonic token proves order: push preflight precedes delivery; task-event delivery precedes the first wait; notify delivery precedes arming; delivery precedes applicable return evidence; `returned_at` precedes coordinator reconciliation; and reconciliation precedes acceptance. A return reconciliation must also be strictly earlier than an unrelated later material dispatch. The one narrow wall-clock exception is an atomic native observation: one task-event wait response, or one notify event delivered together with its payload, may establish `return_event_received_at <= returned_at`, including equality. This records non-decreasing observation, not causal execution order, and does not relax delivery, first wait, arming, reconciliation, acceptance, or later-dispatch boundaries. Push keeps its return event strictly before `returned_at`; manual uses `returned_at` as its return evidence.
 
@@ -248,7 +253,7 @@ attempt_id: attempt_NNN
 intent: notify | request | wait | resume | result
 reply_to: <message_id or null>
 continues: <prior attempt or message, or null>
-expected_return: none | automatic | task_event | push | manual
+expected_return: none | automatic | task_event | notify | push | manual
 ```
 
 Interpret the intents as follows:
@@ -290,7 +295,7 @@ Contract migration is a legacy Codex path. It exists to move an in-flight `push_
 
 The requirement is that a dispatched attempt always has a live return path and that the coordinator closes the gate. Hosts satisfy it in opposite directions, and the difference determines what the coordinator does at the end of its turn.
 
-Under a **pull return**, the coordinator holds the turn and blocks on the wait capability for the exact worker identity. Ending the turn while a dispatched task is running abandons the return path, because nothing will wake the coordinator afterwards.
+Under a **pull return**, the coordinator holds the turn and blocks on the wait capability for the exact worker identity. Ending the turn while a dispatched task is running abandons the return path when that attempt has no verified wake capability.
 
 Under a **re-invocation return**, the host wakes the coordinator with a task notification when a background worker finishes. The coordinator is expected to end its turn after dispatch. Holding the turn open to poll returns no sooner and wastes the wait; a bounded blocking read is justified only when the very next coordinator action depends on that one result and nothing else useful can proceed meanwhile.
 
@@ -438,15 +443,15 @@ lineage:
   predecessor_candidates: []
   protected_behavior: []
 return_contract:
-  return_mode: task_event
-  return_contract_version: task_event_v1
+  return_mode: task_event | notify
+  return_contract_version: task_event_v1 | notify_v1
   skill_commit_at_dispatch: <immutable revision>
   events: [completed, needs_attention]
 ```
 
-The packet must cover the exact current criterion set and authority identities. Every nested object and object-valued list row uses only the fields shown in this schema; unknown fields fail the packet gate. Inspect packet nesting iteratively, cap nesting depth at 64, and reject deeper packets before canonical digest work. This keeps malformed or adversarial persisted state an auditable data failure instead of a coordinator crash. Reject verdict-bias keys such as `producer_verdict`, `preferred_conclusion`, `desired_verdict`, or `unsupported_narrative` anywhere within that bound. Supply factual prior findings only when they remain current regression targets. Worker `threadId`, `hostId`, first-wait timestamp, and returned cursor arise after task creation, so record them on the review execution record rather than mutating the digest-bound packet.
+The packet must cover the exact current criterion set and authority identities. Every nested object and object-valued list row uses only the fields shown in this schema; unknown fields fail the packet gate. Inspect packet nesting iteratively, cap nesting depth at 64, and reject deeper packets before canonical digest work. This keeps malformed or adversarial persisted state an auditable data failure instead of a coordinator crash. Reject verdict-bias keys such as `producer_verdict`, `preferred_conclusion`, `desired_verdict`, or `unsupported_narrative` anywhere within that bound. Supply factual prior findings only when they remain current regression targets. Choose one matching mode/version pair in `return_contract`. Worker identity and return-readiness evidence arise after task creation, so record them on the review execution record rather than mutating the digest-bound packet: `first_wait_at` and `return_cursor` for task-event review, or `return_armed_at` for notify review, never both.
 
-Producer, reviewer, and coordinator must be pairwise distinct, and reviewer `(worker_host_id, worker_thread_id)` must differ from the producer attempt's native pair. After producer return reconciliation, the coordinator records `admitted_at`, then `delivered_at`, then establishes `first_wait_at`; each boundary is strict. Review dispatch is material dispatch for the return-first barrier.
+Producer, reviewer, and coordinator must be pairwise distinct, and reviewer `(worker_host_id, worker_thread_id)` must differ from the producer attempt's native pair. After producer return reconciliation, the coordinator records `admitted_at`, then `delivered_at`, then establishes `first_wait_at` for task-event review or `return_armed_at` for notify review; each boundary is strict. Review dispatch is material dispatch for the return-first barrier.
 
 The reviewer remains read-only and attests that it did not mutate the candidate, waive criteria, unlock dependents, update a current-result pointer, or accept the candidate. It returns exactly one `{criterion_id, requirement, result, evidence}` row per criterion plus structured material findings. One native wait response may atomically expose completion, return event, and payload, so record `completed_at <= return_event_received_at <= returned_at`; reversal fails. The coordinator then records `reconciled_at` and `reconciled_by`; returned/reconciled and reconciled/accepted remain strict, and `accepted_by` is the coordinator.
 

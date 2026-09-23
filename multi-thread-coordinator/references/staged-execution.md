@@ -111,8 +111,9 @@ Prohibited: <later-stage work, unrelated paths, publication, or other boundaries
 Deliverable: <one small artifact or conclusion>
 Evidence required: <primary observations>
 Acceptance: <observable criteria>
-Return: <candidate identity, evidence, finding, question, or failure>
-Return mode: <automatic, task_event using the worker task ID/host, verified push, or disclosed manual return>
+Coordinator: <actual native coordinator identity and routing target, or native parent>
+Return: <mandatory native report on completion/failure/blockage/required input under handoffs.md; stage/attempt, disposition, paths, candidate identity, evidence, unresolved items, next action/owner>
+Return mode: <automatic, task_event using the worker task ID/host, notify using the armed worker identity, verified push, or disclosed manual return>
 Return event: <completed or needs_attention for task_event; result, needs_input, or blocked for push>
 Stop when: <missing authority, unsafe write, business decision, or unmet prerequisite>
 ```
@@ -139,7 +140,7 @@ No `failed`, `needs_input`, `blocked`, or `superseded` stage unlocks a dependent
 
 ## 7. Pass and Adapt the Next Stage
 
-After a pass:
+Apply [handoffs.md](handoffs.md) in the same active turn as the return. After a pass:
 
 1. mark the current attempt and stage `succeeded`;
 2. record the exact succeeded candidate and evidence;
@@ -148,7 +149,10 @@ After a pass:
 5. preserve unaffected later objectives and replace assumptions that the evidence disproved;
 6. build the next eligible stage brief from the succeeded candidate and current authority;
 7. set that stage as `unlocked_stage_id` only when all its gates pass;
-8. tell the user what passed, what changed in the next step, and what remains held when that change is material.
+8. send the next ready brief to the same worker and establish its host-appropriate return path without asking again for existing authorization;
+9. tell the user what passed, what changed in the next step, and what remains held when that change is material.
+
+A diagnosis or design worker returns its bounded report and yields; it must not idle indefinitely waiting for the coordinator inside that stage. The coordinator receives the report, inspects the actual files and source/output identities, and owns continuation. A stage pass is not completion of the overall request. If a real hold or user-directed pause prevents continuation, retain its reason, owner, and next action; do not end an in-turn return chain merely because the next brief has not yet been sent.
 
 Use this compact adaptation record when useful:
 
@@ -188,7 +192,7 @@ Avoid vague instructions such as “try again,” “improve quality,” or “r
 
 ## 9. Continue With the Same Owner
 
-Reuse the original internal subagent or user-visible task when its context remains valid and it has the necessary capability. Send the next-stage or rework brief as a correlated follow-up rather than opening another thread, then establish a fresh return contract for the new attempt. Use the host's resume capability, so the owner keeps the context it already built: a correlated follow-up on the same thread, or a message addressed to the same worker by name. Creating a new worker instead discards that context and makes it re-derive the brief, which is a cost to weigh rather than a neutral choice. For a user-visible task, default to `task_event` and wait again on the same worker identity, such as its `threadId` and `hostId`; reuse the latest cursor only within the attempt to which it belongs. The coordinator continues to own the gate rather than taking over the worker's material production. It resumes from native return events and does not use periodic task reads for progress.
+Reuse the original internal subagent or user-visible task when its context remains valid and it has the necessary capability. Send the next-stage or rework brief as a correlated follow-up rather than opening another thread, then establish a fresh return contract for the new attempt. Use the host's resume capability, so the owner keeps the context it already built: a correlated follow-up on the same thread, or a message addressed to the same worker by name. Creating a new worker instead discards that context and makes it re-derive the brief, which is a cost to weigh rather than a neutral choice. For a user-visible task, use the host contract: under `task_event`, wait again on the same worker identity, such as its `threadId` and `hostId`, and reuse the latest cursor only within the attempt to which it belongs; under `notify`, arm the same worker’s next attempt and resume from its notification. The coordinator continues to own the gate rather than taking over the worker's material production. It resumes from native return events and does not use periodic task reads for progress.
 
 Change owner only when:
 
@@ -289,8 +293,8 @@ Verify all of these before treating progressive execution as implemented:
 - The coordinator recommends a durable user-visible task for a material staged chain and an internal subagent for a short helper, then obtains one consolidated surface choice when the user has not already decided.
 - Continuous stages reuse the selected worker rather than creating a new user-visible task per stage; independent modules may use separate workers.
 - Each user-visible stage returns through a native completion-or-attention event tied to the created worker task identity by default; the coordinator then gates the candidate and sends the next stage or rework.
-- A next-stage or rework follow-up establishes a fresh task-event wait for the same worker; verified push is only a fallback, and manual return is disclosed before dispatch.
-- Event waiting is the normal continuation mechanism; periodic native-state reads are reserved for recovery, missing evidence, or a requested status check.
+- A next-stage or rework follow-up establishes a fresh task-event wait or verified notify arming for the same worker, according to observed host capabilities; verified push is only a fallback, and manual return is disclosed before dispatch.
+- Host-appropriate native event continuation (in-turn waiting or verified wake notification) is the normal mechanism; bounded native-state reads are reserved for recovery, missing evidence, or a requested status check.
 - Stage reports distinguish returned, accepted, rework, held, needs-input, blocked, and superseded work without adding new lifecycle statuses.
 
 Tabletop probes establish protocol coverage only. Use fresh-context forward tests in the designated roadmap stage before claiming general behavioral validation.
