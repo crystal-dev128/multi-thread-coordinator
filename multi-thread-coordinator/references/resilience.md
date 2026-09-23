@@ -114,8 +114,11 @@ admitted_at: <after producer return reconciliation>
 delivered_at: <after admission>
 worker_thread_id: <created reviewer task id>
 worker_host_id: <reviewer host id>
+# task_event review uses these two fields; notify omits both:
 first_wait_at: <timestamp>
 return_cursor: <latest native wait cursor>
+# notify review uses return_armed_at: <timestamp> instead.
+# Select the mode/version in packet.return_contract.
 completed_at: <timestamp>
 return_event_received_at: <timestamp>
 returned_at: <timestamp>
@@ -137,9 +140,11 @@ resolution: null | <coordinator-owned supersession record from protocol.md>
 optional_adjudication: null | <coordinator-owned optional-review record from protocol.md>
 ```
 
-Give the reviewer the exact candidate, current requirements, raw sources and evidence, permitted read scope, prohibited actions, lineage, protected behavior, and task-event return contract. Do not present the implementer's verdict, the coordinator's preferred conclusion, or unsupported narrative as fact.
+Include the mandatory coordinator identity and native return/report obligation in [handoffs.md](handoffs.md) in every reviewer brief, including failure and attention outcomes.
 
-Each material finding must identify a current criterion ID, its exact current requirement text, expected result, observed result, location, evidence, impact, and requested delta. The digest-bound packet uses exact nested field allowlists, iterative traversal, a maximum depth of 64, and verdict-bias exclusion; over-depth state fails before digest canonicalization so malformed persisted input cannot crash coordination audit. The review task's native host/thread pair must differ from production. Producer reconciliation/admission, admission/delivery, delivery/first wait, returned/reconciled, reconciliation/resolution, and resolution/acceptance follow strict causal order. One atomic native response may record `completed_at <= return_event_received_at <= returned_at`. Review delivery also participates in the return-first barrier. Send an authorized correction to the original owner first when practical. Preserve the finding and changed candidate identities.
+Give the reviewer the exact candidate, current requirements, raw sources and evidence, permitted read scope, prohibited actions, lineage, protected behavior, and host-appropriate native return contract. Do not present the implementer's verdict, the coordinator's preferred conclusion, or unsupported narrative as fact.
+
+Each material finding must identify a current criterion ID, its exact current requirement text, expected result, observed result, location, evidence, impact, and requested delta. The digest-bound packet uses exact nested field allowlists, iterative traversal, a maximum depth of 64, and verdict-bias exclusion; over-depth state fails before digest canonicalization so malformed persisted input cannot crash coordination audit. The review task's native host/thread pair must differ from production. Producer reconciliation/admission, admission/delivery, delivery/first wait or notification arming, returned/reconciled, reconciliation/resolution, and resolution/acceptance follow strict causal order. One atomic native response may record `completed_at <= return_event_received_at <= returned_at`. Review delivery also participates in the return-first barrier. Send an authorized correction to the original owner first when practical. Preserve the finding and changed candidate identities.
 
 Every effective review gates acceptance, whether review was required or optional: one clean review does not mask another effective failed criterion or open material finding. An adverse review may become `superseded` only through a later effective clean review on the same candidate plus a coordinator-owned, exact adverse-criterion resolution whose cited evidence is passing, bound to that candidate and criterion, and observed strictly before resolution. For `review_required: false` only, the coordinator may instead adjudicate every adverse criterion exactly once as `false_positive`, `nonmaterial`, `outside_supported_scope`, or `confirmed_material`, with passing same-candidate/same-criterion evidence observed strictly before adjudication and adjudication strictly between review reconciliation and acceptance. The first three dispositions clear that optional adverse criterion; confirmed material, missing coverage, invalid review structure, or required-review use holds the gate. Clean reviews cannot be discarded. This preserves anti-review-shopping while avoiding a de facto optional-review veto; the coordinator owns cross-task authority and in-scope materiality. A required review passes only when at least one effective fresh read-only reviewer covers every current criterion with evidence, every other effective adverse review is resolved through the permitted supersession route, every return is reconciled strictly before acceptance, and the attempt records the coordinator in `accepted_by`.
 
@@ -198,7 +203,7 @@ On resume:
 2. restore each running user-visible task's worker identity, such as `threadId` and `hostId` or an agent name and id, together with its return mode and latest event cursor, then resume the host's return path when it remains valid. Treat a running worker as uncertain when the resumed host no longer exposes the capabilities the recorded return mode assumed;
 3. inspect native tasks, commands, applications, worktrees, and external operations when the wait cannot be safely resumed or reconciliation is otherwise required;
 4. inspect candidate locations and immutable identities;
-5. reconcile delivered, returned, accepted, and uncertain attempts;
+5. reconcile delivered, returned, accepted, and uncertain attempts; process missed returns and accepted-but-undelivered outcomes in native history before unrelated work, preserving cancelled or user-paused boundaries;
 6. update supersession impact before accepting late output;
 7. record `reconciled_at` only after uncertainty is resolved;
 8. audit the run before resuming or retrying mutation.
@@ -283,6 +288,8 @@ Closure requires:
 - every retry has a complete pre-retry audit and strictly causal delivered ancestry;
 - every staged chain has no unlocked or non-terminal effective stage;
 - the latest-result manifest and actual source/output identities pass when a current result exists.
+
+A passing audit proves technical closure only. Separately apply [handoffs.md](handoffs.md): deliver the requested accepted result/link and limitations to the main user-facing conversation and retain its native delivery receipt before declaring the request closed. Do not add delivery fields to strict v2 records.
 
 Separately inspect native surfaces for work that was not persisted. Wait for, cancel, supersede, or report every active task, command, monitor, automation, worktree, and external operation.
 

@@ -28,7 +28,7 @@ hosts do not satisfy all of them.
 | `spawn_durable_worker` | Start a traceable worker the user can inspect, and the coordinator can continue or rework. |
 | `await_return` | Learn that a worker completed or needs attention, without polling its transcript. |
 | `read_worker_evidence` | Recover omitted detail or reconcile after interruption. |
-| `worker_push` | Let a worker actively notify the coordinator when `await_return` is unavailable. |
+| `worker_push` | Route a report to the exact coordinator; verify separately whether it wakes an idle coordinator. |
 | `resume_same_worker` | Send a next-stage or rework brief to the original owner with its context intact. |
 | `isolate_checkout` | Give concurrent mutable code work its own checkout. |
 | `worker_identity` | Name the exact worker an attempt was dispatched to. |
@@ -47,8 +47,7 @@ hosts do not satisfy all of them.
 | `resume_same_worker` | correlated follow-up on the same thread | `SendMessage` addressed to the agent by name |
 | `isolate_checkout` | authorized worktree-backed task | `Agent` with worktree isolation |
 
-A capability with no entry for the current host is unavailable, not optional. Fall back
-through the order in Section 6.
+The table describes common adapters, not permanent product guarantees. Prefer the capabilities and continuation semantics actually exposed in the current session. An absent table entry is not proof of absence; perform bounded discovery before falling back through Section 6.
 
 ## 4. Two Return Models
 
@@ -56,16 +55,18 @@ The protocol requires that a dispatched attempt always has a live return path an
 coordinator, not the worker, closes the gate. Hosts satisfy that requirement in opposite
 directions, and the difference changes what the coordinator does at the end of its turn.
 
-**Pull return (Codex).** The coordinator holds the turn and blocks on `wait_threads` for
+**In-turn wait (for example, a host exposing `wait_threads` without verified wake notifications).** The coordinator keeps the return path live with interruptible, bounded `wait_threads` calls for
 the exact worker identity. Ending the turn while a dispatched task is running abandons the
-return path, because nothing will wake the coordinator afterwards. A bounded timeout means
-only that no event arrived; retain the identity and cursor and wait again.
+return path when no wake capability has been verified for that attempt. A bounded timeout means
+only that no event arrived; retain the identity and cursor and wait again. Handle incoming user requests between waits immediately; waiting on one task does not prevent answering a question or advancing authorized independent work. Reconcile already received events before new material dispatch, as specified in the protocol.
 
-**Re-invocation return (Claude Code).** The host wakes the coordinator with a task
+**Re-invocation return (for example, a verified background-task notification).** The host wakes the coordinator with a task
 notification when a background worker finishes. The coordinator is expected to end its turn
 after dispatch; holding the turn open to poll wastes the wait and returns no sooner.
 Blocking on a bounded output read is justified only when the very next coordinator action
 depends on that one result and nothing else useful can happen meanwhile.
+
+Active worker reporting and coordinator continuation are separate capabilities. Follow [handoffs.md](handoffs.md) for explicit native reports, event/push deduplication, same-turn action, user delivery, bounded send failure, and interruption recovery. Neither a tool name nor successful messaging proves idle wake-up. Do not use scheduled polling as a return-path substitute.
 
 Both models satisfy the same invariant: the coordinator never abandons the return path and
 never hands the user a worker result it has not verified. Neither model makes a returned
@@ -99,6 +100,8 @@ provides rather than the one the surrounding examples happen to show.
 ## 5. Claude Code Specifics
 
 Apply these in addition to the table above.
+
+**Persist only observed identity.** For Claude records, `worker_thread_id` carries the returned `agentId`; keep the routing name in native history. `worker_host_id` must identify the actual observed session or host namespace containing that agent. Do not substitute a generic product label or invent a session ID. If the host exposes no suitable namespace identity, retain native task history and report that strict persisted identity conformance cannot be established; this limitation does not block supported native notification or continuation.
 
 **Workers are scoped to the session.** A background agent does not outlive the session that
 spawned it, whereas a Codex thread persists. Do not recommend a durable worker on the
@@ -136,8 +139,8 @@ acceptance in the run record.
 Worker-to-worker messages are already rendered to the user, so summarize their outcome
 rather than quoting them back.
 
-**Persist `notify_v1`, not `task_event_v1`.** There is no in-turn wait to record here, so
-an attempt on this host records `return_armed_at` and omits the wait cursor. See Section 4a.
+**Persist the observed return model.** For the notification adapter described here, there is no in-turn wait to record, so
+an attempt records `return_armed_at` and omits the wait cursor. See Section 4a.
 
 **Worker setup is immediate.** Spawning returns a usable worker identity directly, so the
 Codex precaution against waiting on a queued setup identifier — `clientThreadId`, which
@@ -152,7 +155,9 @@ of around the block.
 
 ## 6. When a Capability Is Missing
 
-Resolve in this order, and state the result before dispatching material work:
+Before classifying an expected capability as unavailable, follow [runtime-recovery.md](runtime-recovery.md) for bounded discovery and read-only diagnosis. Preserve the user-selected surface and distinguish a capability absent on this host from a previously available capability with a connection failure. Do not turn a temporary discovery gap into a permanent manual-return arrangement.
+
+After that diagnosis, resolve in this order, and state the result before dispatching material work:
 
 1. `await_return` available: use it. This is the default for a durable worker.
 2. `await_return` unavailable, `worker_push` verified: instruct the worker to push, but only

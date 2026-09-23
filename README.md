@@ -19,7 +19,7 @@ Do not use it for a simple action that one agent can complete and verify directl
 
 ## Install
 
-Pin installations to the public release tag `v0.1.0`.
+Pin installations to the public release tag `v0.1.1`.
 
 ### Codex
 
@@ -27,7 +27,7 @@ Ask Codex:
 
 ```text
 Use $skill-installer to install the skill from
-crystal-dev128/multi-thread-coordinator at ref v0.1.0,
+crystal-dev128/multi-thread-coordinator at ref v0.1.1,
 using the path multi-thread-coordinator.
 ```
 
@@ -38,7 +38,7 @@ The Skill becomes available on the next Codex turn. If a directory named `multi-
 Clone the pinned public release and copy the Skill directory into a Skills location loaded by Claude Code:
 
 ```bash
-git clone --branch v0.1.0 --depth 1 https://github.com/crystal-dev128/multi-thread-coordinator.git
+git clone --branch v0.1.1 --depth 1 https://github.com/crystal-dev128/multi-thread-coordinator.git
 mkdir -p ~/.claude/skills
 cp -R multi-thread-coordinator/multi-thread-coordinator ~/.claude/skills/
 ```
@@ -65,6 +65,9 @@ You do not need to pre-split the work. Give the coordinator the outcome, the app
 - `mixed`: combine independent modules with staged joins;
 - worker surfaces: choose bounded internal helpers for short work and durable visible tasks when traceability or user follow-up matters;
 - return path: bind each visible worker to a native completion or notification mechanism, then let the coordinator inspect and accept the result;
+- follow-through: return worker results to the coordinator, act on them in the same active turn, and deliver accepted outcomes in the main conversation;
+- approval holds: tell the user which worker task needs attention, why approval was refused, and what supported action is needed, then reconcile the outcome before resuming;
+- recovery: resolve queued task identities and temporary tool gaps from observed evidence while preserving authorized continuation;
 - review: use a fresh read-only reviewer for external publication and other high-risk candidates.
 
 The Skill does not provide a daemon, task board, permanent message broker, or exactly-once delivery guarantee. It relies on the current host's native task and agent capabilities.
